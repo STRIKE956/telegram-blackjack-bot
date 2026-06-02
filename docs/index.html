@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STRIKE Blackjack — Telegram Wallet</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@2.0.11/dist/tonconnect-ui.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      text-align: center;
+      padding: 24px 16px;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 8px; }
+    p { color: #8b949e; font-size: 0.95rem; }
+    #ton-connect { margin: 24px auto; display: flex; justify-content: center; }
+    #status { margin-top: 16px; font-size: 0.9rem; color: #3fb950; }
+  </style>
+</head>
+<body>
+  <h1>♠️ STRIKE Blackjack</h1>
+  <p>Connect your Telegram Wallet (TON) to link with the bot.</p>
+  <div id="ton-connect"></div>
+  <div id="status">Choose Wallet or Telegram Wallet in the popup.</div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    const manifestUrl = new URL("tonconnect-manifest.json", window.location.href).toString();
+
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl,
+      buttonRootId: "ton-connect",
+    });
+
+    function sendWalletToBot(wallet) {
+      if (!wallet || !wallet.account) return;
+      const payload = {
+        action: "wallet_connected",
+        address: wallet.account.address,
+        chain: wallet.account.chain,
+      };
+      document.getElementById("status").textContent = "Linked! Returning to bot…";
+      tg.sendData(JSON.stringify(payload));
+      setTimeout(() => tg.close(), 600);
+    }
+
+    tonConnectUI.onStatusChange((wallet) => {
+      if (wallet) {
+        document.getElementById("status").textContent =
+          "Connected: " + wallet.account.address.slice(0, 6) + "…";
+        sendWalletToBot(wallet);
+      }
+    });
+
+    tonConnectUI.connectionRestored.then((restored) => {
+      if (restored) sendWalletToBot(tonConnectUI.wallet);
+    });
+  </script>
+</body>
+</html>
