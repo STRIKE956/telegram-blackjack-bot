@@ -1,6 +1,7 @@
 import os
 import sqlite3
 from pathlib import Path
+from typing import Optional
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 DB_PATH = DATA_DIR / "bot.db"
@@ -11,8 +12,14 @@ def _connect():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, strikecoins INTEGER NOT NULL)"
+        "CREATE TABLE IF NOT EXISTS users ("
+        "user_id INTEGER PRIMARY KEY, "
+        "strikecoins INTEGER NOT NULL, "
+        "ton_wallet TEXT)"
     )
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+    if "ton_wallet" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN ton_wallet TEXT")
     return conn
 
 
@@ -40,4 +47,22 @@ def set_strikecoins(user_id: int, amount: int) -> None:
         conn.execute(
             "UPDATE users SET strikecoins = ? WHERE user_id = ?",
             (amount, user_id),
+        )
+
+
+def get_ton_wallet(user_id: int) -> Optional[str]:
+    ensure_user(user_id)
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT ton_wallet FROM users WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        return row[0] if row and row[0] else None
+
+
+def set_ton_wallet(user_id: int, address: str) -> None:
+    ensure_user(user_id)
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE users SET ton_wallet = ? WHERE user_id = ?",
+            (address, user_id),
         )
