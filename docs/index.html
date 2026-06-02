@@ -2,66 +2,74 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>STRIKE Blackjack — Telegram Wallet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="strike-api" content="" />
+  <title>STRIKE Games</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://unpkg.com/@tonconnect/ui@2.0.11/dist/tonconnect-ui.min.js"></script>
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-      background: #0d1117;
-      color: #e6edf3;
-      text-align: center;
-      padding: 24px 16px;
-    }
-    h1 { font-size: 1.4rem; margin-bottom: 8px; }
-    p { color: #8b949e; font-size: 0.95rem; }
-    #ton-connect { margin: 24px auto; display: flex; justify-content: center; }
-    #status { margin-top: 16px; font-size: 0.9rem; color: #3fb950; }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>♠️ STRIKE Blackjack</h1>
-  <p>Connect your Telegram Wallet (TON) to link with the bot.</p>
-  <div id="ton-connect"></div>
-  <div id="status">Choose Wallet or Telegram Wallet in the popup.</div>
-
-  <script>
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
-
-    const manifestUrl = new URL("tonconnect-manifest.json", window.location.href).toString();
-
-    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-      manifestUrl,
-      buttonRootId: "ton-connect",
-    });
-
-    function sendWalletToBot(wallet) {
-      if (!wallet || !wallet.account) return;
-      const payload = {
-        action: "wallet_connected",
-        address: wallet.account.address,
-        chain: wallet.account.chain,
-      };
-      document.getElementById("status").textContent = "Linked! Returning to bot…";
-      tg.sendData(JSON.stringify(payload));
-      setTimeout(() => tg.close(), 600);
-    }
-
-    tonConnectUI.onStatusChange((wallet) => {
-      if (wallet) {
-        document.getElementById("status").textContent =
-          "Connected: " + wallet.account.address.slice(0, 6) + "…";
-        sendWalletToBot(wallet);
-      }
-    });
-
-    tonConnectUI.connectionRestored.then((restored) => {
-      if (restored) sendWalletToBot(tonConnectUI.wallet);
-    });
-  </script>
+  <div id="app">
+    <header class="header">
+      <div class="logo">♠️ STRIKE</div>
+      <div class="chips" id="balance">…</div>
+    </header>
+    <nav class="tabs">
+      <button class="tab active" data-tab="play">Play</button>
+      <button class="tab" data-tab="strike">Strike</button>
+      <button class="tab" data-tab="squad">Squad</button>
+      <button class="tab" data-tab="vibes">Vibes</button>
+    </nav>
+    <main id="panel-play" class="panel active">
+      <div class="table">
+        <div class="dealer-area">
+          <div class="label">Dealer <span id="dealer-val"></span></div>
+          <div class="cards" id="dealer-cards"></div>
+        </div>
+        <div class="player-area">
+          <div class="label">You <span id="player-val"></span></div>
+          <div class="cards" id="player-cards"></div>
+        </div>
+      </div>
+      <p class="status" id="game-status">Place a bet and deal!</p>
+      <div class="bet-row">
+        <input type="number" id="bet" value="100" min="10" step="10" />
+        <button id="btn-deal" class="btn primary">Deal</button>
+      </div>
+      <div class="actions" id="actions" hidden>
+        <button id="btn-hit" class="btn">Hit</button>
+        <button id="btn-stand" class="btn primary">Stand</button>
+      </div>
+    </main>
+    <main id="panel-strike" class="panel">
+      <div class="strike-avatar">⚡</div>
+      <p class="strike-title">Strike · hype bestie</p>
+      <div class="chat" id="strike-chat"></div>
+      <div class="chat-input">
+        <input id="strike-msg" placeholder="Talk to Strike…" />
+        <button id="btn-strike-send" class="btn primary">Send</button>
+      </div>
+    </main>
+    <main id="panel-squad" class="panel">
+      <p class="hint">Compete with friends — most STRIKECOINS wins.</p>
+      <div class="room-actions">
+        <button id="btn-room-create" class="btn">Create room</button>
+        <button id="btn-room-join" class="btn">Join code</button>
+      </div>
+      <input id="room-code" placeholder="ROOM CODE" class="room-input" />
+      <ul class="leaderboard" id="leaderboard"></ul>
+      <p class="invite" id="invite-link"></p>
+    </main>
+    <main id="panel-vibes" class="panel">
+      <p class="hint">Table soundtrack — tap to play in Telegram.</p>
+      <div id="tracks"></div>
+      <h3>Live streams</h3>
+      <div id="live-streams"></div>
+    </main>
+    <footer class="footer">
+      <a href="#" id="disclaimer-link">Disclaimer</a> · entertainment only
+    </footer>
+  </div>
+  <script src="app.js"></script>
 </body>
 </html>
