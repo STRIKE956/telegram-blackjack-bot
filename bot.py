@@ -1,9 +1,17 @@
 import asyncio
+import json
 import logging
 import os
 import random
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 import solana_wallet
 import storage
@@ -13,6 +21,19 @@ logging.basicConfig(level=logging.INFO)
 CURRENCY_NAME = "STRIKECOINS"
 STARTING_STRIKECOINS = 1000
 DEFAULT_BET = 100
+WEBAPP_URL = os.environ.get(
+    "WEBAPP_URL",
+    "https://strike956.github.io/telegram-blackjack-bot/",
+)
+
+
+def wallet_connect_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(
+            "🔗 Connect Telegram Wallet",
+            web_app=WebAppInfo(url=WEBAPP_URL),
+        )]
+    ])
 
 class BlackjackGame:
     def __init__(self):
@@ -60,16 +81,67 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Balance: {format_coins(user['strikecoins'])}\n\n"
         "/play [amount] — bet STRIKECOINS\n"
         "/balance — STRIKECOINS balance\n"
-        "/wallet — your Solana address (devnet)\n"
-        "/sol\\_balance — SOL on devnet\n"
-        "/sol\\_airdrop — free devnet SOL (testing)\n"
+        "/connect — link **Telegram Wallet** (TON)\n"
+        "/ton\\_wallet — view linked TON address\n"
+        "/wallet — Solana devnet (separate)\n"
         "/help — rules & commands",
+        reply_markup=wallet_connect_keyboard(),
         parse_mode="Markdown",
     )
 
 async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(update.effective_user.id)
     await update.message.reply_text(f"🪙 {format_coins(user['strikecoins'])}")
+
+async def connect_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Tap the button to open the Mini App and connect "
+        "**Telegram Wallet** or any TON wallet via TON Connect.",
+        reply_markup=wallet_connect_keyboard(),
+        parse_mode="Markdown",
+    )
+
+
+async def ton_wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    address = storage.get_ton_wallet(user_id)
+    if not address:
+        await update.message.reply_text(
+            "No Telegram Wallet linked yet. Use /connect.",
+            reply_markup=wallet_connect_keyboard(),
+        )
+        return
+    await update.message.reply_text(
+        f"◎ **Telegram Wallet (TON)**\n\n`{address}`",
+        parse_mode="Markdown",
+    )
+
+
+async def on_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    try:
+        data = json.loads(update.effective_message.web_app_data.data)
+    except json.JSONDecodeError:
+        await update.message.reply_text("Invalid wallet data from Mini App.")
+        return
+
+    if data.get("action") != "wallet_connected":
+        return
+
+    address = data.get("address")
+    if not address:
+        await update.message.reply_text("Wallet connect failed — no address returned.")
+        return
+
+    storage.set_ton_wallet(user_id, address)
+    await update.message.reply_text(
+        f"✅ **Telegram Wallet linked**\n\n"
+        f"TON address: `{address}`\n\n"
+        f"STRIKECOINS blackjack still uses `/balance`. "
+        f"On-chain TON deposits → STRIKECOINS can be added next.",
+        parse_mode="Markdown",
+    )
+
 
 async def wallet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -122,11 +194,12 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"**{CURRENCY_NAME}** — in-game chips for blackjack\n"
         f"• `/play` or `/play 50` — bet (default {DEFAULT_BET})\n"
         f"• `/balance` — STRIKECOINS stack\n\n"
-        "**Solana (devnet)** — real test SOL, not STRIKECOINS\n"
-        "• `/wallet` — your Solana deposit address\n"
-        "• `/sol_balance` — check SOL\n"
-        "• `/sol_airdrop` — claim 1 devnet SOL (testing)\n\n"
-        "STRIKECOINS and SOL are separate. Linking deposits to chips can be added later.",
+        "**Telegram Wallet (TON)**\n"
+        "• `/connect` — open Mini App, link @wallet / Tonkeeper\n"
+        "• `/ton_wallet` — your linked TON address\n\n"
+        "**Solana (devnet)** — optional, separate from Telegram Wallet\n"
+        "• `/wallet`, `/sol_balance`, `/sol_airdrop`\n\n"
+        "Depositing TON to credit STRIKECOINS is not enabled yet.",
         parse_mode="Markdown",
     )
 
@@ -234,6 +307,9 @@ if __name__ == '__main__':
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("balance", balance))
+    app.add_handler(CommandHandler("connect", connect_wallet))
+    app.add_handler(CommandHandler("ton_wallet", ton_wallet_cmd))
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, on_web_app_data))
     app.add_handler(CommandHandler("wallet", wallet_cmd))
     app.add_handler(CommandHandler("sol_balance", sol_balance))
     app.add_handler(CommandHandler("sol_airdrop", sol_airdrop))
